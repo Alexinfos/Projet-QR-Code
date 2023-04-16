@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-def show_matrix(M):
+def show_matrix(M, grid=False):
     # Affiche l'image seule
     plt.imshow(M, cmap=plt.get_cmap('binary'))
     plt.show()

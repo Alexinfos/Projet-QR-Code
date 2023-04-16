@@ -64,11 +64,70 @@ def generate_reserved_areas(version):
                 continue
             P[x - 2:x + 3, y - 2:y + 3] = 1
 
-    if version > 1:
+    if version >= 7:
         P[size - 11:size - 7, :6] = 1
         P[:6, size - 11:size - 7] = 1
 
     return P
+
+def generate_version_info(version):
+    size = (version - 1) * 4 + 21
+    V = np.zeros((size, size))
+    if version < 7:
+        return V
+    
+    # TODO: compute this by ourself
+    binVersion = VERSION_BITS[version]
+    
+    for i in range(6):
+        for j in range(3):
+            color = binVersion & 0b1
+            V[size - 11 + j, i] = color
+            V[i, size - 11 + j] = color
+            binVersion = binVersion >> 1
+
+    return V
+
+def generate_format_info(version, correctionLevel, mask):
+    size = (version - 1) * 4 + 21
+
+    # Generate masked format string
+    corrBits = CORRECTION_BITS[correctionLevel]
+
+    bits = (corrBits << 3) | mask
+    currFormatString = bits << 10
+
+    poly = 0b10100110111
+
+    while currFormatString.bit_length() > 10:
+        diff = currFormatString.bit_length() - poly.bit_length()
+        paddedPoly = poly << diff
+        currFormatString = paddedPoly ^ currFormatString
+
+    combined = (bits << 10) | currFormatString
+
+    mask = 0b101010000010010
+    maskedFormatString = combined ^ mask
+
+    # Place masked format string onto QR Code
+    F = np.zeros((size, size))
+    for i in range(15):
+        bit = maskedFormatString & 0b1
+        maskedFormatString = maskedFormatString >> 1
+        if i < 6:
+            F[8, i] = bit
+            F[size - i - 1, 8] = bit 
+        elif i == 6:
+            F[8, i+1] = bit
+            F[size - i - 1, 8] = bit
+        elif i < 9:
+            F[15 - i, 8] = bit
+            F[8, size - 15 + i] = bit
+        else:
+            F[14 - i, 8] = bit
+            F[8, size - 15 + i] = bit
+
+    return F
 
 def add_padding(M, l, r, t, b):
     h, w = M.shape
@@ -142,6 +201,54 @@ ALIGNMENT_LOCATIONS = {
     40: [6, 30, 58, 86, 114, 142, 170]
 }
 
+VERSION_BITS = {
+    7:	0b000111110010010100,
+    8:	0b001000010110111100,
+    9:	0b001001101010011001,
+    10:	0b001010010011010011,
+    11:	0b001011101111110110,
+    12:	0b001100011101100010,
+    13:	0b001101100001000111,
+    14:	0b001110011000001101,
+    15:	0b001111100100101000,
+    16:	0b010000101101111000,
+    17:	0b010001010001011101,
+    18:	0b010010101000010111,
+    19:	0b010011010100110010,
+    20:	0b010100100110100110,
+    21:	0b010101011010000011,
+    22:	0b010110100011001001,
+    23:	0b010111011111101100,
+    24:	0b011000111011000100,
+    25:	0b011001000111100001,
+    26:	0b011010111110101011,
+    27:	0b011011000010001110,
+    28:	0b011100110000011010,
+    29:	0b011101001100111111,
+    30:	0b011110110101110101,
+    31:	0b011111001001010000,
+    32:	0b100000100111010101,
+    33:	0b100001011011110000,
+    34:	0b100010100010111010,
+    35:	0b100011011110011111,
+    36:	0b100100101100001011,
+    37:	0b100101010000101110,
+    38:	0b100110101001100100,
+    39:	0b100111010101000001,
+    40:	0b101000110001101001
+}
+
+CORRECTION_BITS = {
+    0: 0b01,
+    1: 0b00,
+    2: 0b11,
+    3: 0b10,
+    'L': 0b01,
+    'M': 0b00,
+    'Q': 0b11,
+    'H': 0b10
+}
+
 
 # Tests
 # M = add_padding(FINDER_PATTERN, 3, 4, 2, 5)
@@ -149,8 +256,18 @@ ALIGNMENT_LOCATIONS = {
 
 # generate_finder_patterns(1)
 
-version = 8
-patterns = np.logical_or(np.logical_or(generate_finder_patterns(version),  generate_alignment_patterns(version)), np.logical_or(generate_timing_patterns(version), generate_dark_module(version)))
+version = 1
+errorCorrection = 'Q'
+mask = 6
+patterns = np.logical_or(np.logical_or(np.logical_or(np.logical_or(generate_finder_patterns(version),  generate_alignment_patterns(version)), np.logical_or(generate_timing_patterns(version), generate_dark_module(version))), generate_version_info(version)), generate_format_info(version, errorCorrection, mask))
+
+# (quiet zone)
+# patterns = add_padding(patterns, 4, 4, 4, 4)
+
 display.show_matrix(patterns)
-display.show_matrix(generate_reserved_areas(version))
+#display.show_matrix(generate_reserved_areas(version))
+
+
+
+
 

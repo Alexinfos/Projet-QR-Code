@@ -76,9 +76,18 @@ def generate_version_info(version):
     if version < 7:
         return V
     
-    # TODO: compute this by ourself
-    binVersion = VERSION_BITS[version]
-    
+    poly = 0b1111100100101
+
+    diff = 18 - version.bit_length()
+    currVersionString = version << 12
+
+    while currVersionString.bit_length() > 12:
+        diff = currVersionString.bit_length() - poly.bit_length()
+        paddedPoly = poly << diff
+        currVersionString = paddedPoly ^ currVersionString
+
+    binVersion = (version << 12) | currVersionString
+
     for i in range(6):
         for j in range(3):
             color = binVersion & 0b1
@@ -201,43 +210,6 @@ ALIGNMENT_LOCATIONS = {
     40: [6, 30, 58, 86, 114, 142, 170]
 }
 
-VERSION_BITS = {
-    7:	0b000111110010010100,
-    8:	0b001000010110111100,
-    9:	0b001001101010011001,
-    10:	0b001010010011010011,
-    11:	0b001011101111110110,
-    12:	0b001100011101100010,
-    13:	0b001101100001000111,
-    14:	0b001110011000001101,
-    15:	0b001111100100101000,
-    16:	0b010000101101111000,
-    17:	0b010001010001011101,
-    18:	0b010010101000010111,
-    19:	0b010011010100110010,
-    20:	0b010100100110100110,
-    21:	0b010101011010000011,
-    22:	0b010110100011001001,
-    23:	0b010111011111101100,
-    24:	0b011000111011000100,
-    25:	0b011001000111100001,
-    26:	0b011010111110101011,
-    27:	0b011011000010001110,
-    28:	0b011100110000011010,
-    29:	0b011101001100111111,
-    30:	0b011110110101110101,
-    31:	0b011111001001010000,
-    32:	0b100000100111010101,
-    33:	0b100001011011110000,
-    34:	0b100010100010111010,
-    35:	0b100011011110011111,
-    36:	0b100100101100001011,
-    37:	0b100101010000101110,
-    38:	0b100110101001100100,
-    39:	0b100111010101000001,
-    40:	0b101000110001101001
-}
-
 CORRECTION_BITS = {
     0: 0b01,
     1: 0b00,
@@ -256,7 +228,7 @@ CORRECTION_BITS = {
 
 # generate_finder_patterns(1)
 
-version = 8
+version = 7
 errorCorrection = 'Q'
 mask = 6
 patterns = np.logical_or(np.logical_or(np.logical_or(np.logical_or(generate_finder_patterns(version),  generate_alignment_patterns(version)), np.logical_or(generate_timing_patterns(version), generate_dark_module(version))), generate_version_info(version)), generate_format_info(version, errorCorrection, mask))
@@ -265,7 +237,7 @@ patterns = np.logical_or(np.logical_or(np.logical_or(np.logical_or(generate_find
 patterns = add_padding(patterns, 4, 4, 4, 4)
 
 display.show_matrix(patterns)
-#display.show_matrix(generate_reserved_areas(version))
+display.show_matrix(generate_reserved_areas(version))
 
 
 

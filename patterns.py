@@ -8,12 +8,12 @@ def generate_finder_patterns(version):
     topRight = add_padding(FINDER_PATTERN, size-7, 0, 0, size-7)
     bottomLeft = add_padding(FINDER_PATTERN, 0, size-7, size-7, 0)
 
-    return topLeft + topRight + bottomLeft
+    return topLeft | topRight | bottomLeft
 
 def generate_alignment_patterns(version):
     size = (version - 1) * 4 + 21
 
-    P = np.zeros((size, size))
+    P = np.zeros((size, size), dtype=np.uint8)
     locations = ALIGNMENT_LOCATIONS[version]
 
     for x in locations:
@@ -27,7 +27,7 @@ def generate_alignment_patterns(version):
 def generate_timing_patterns(version):
     size = (version - 1) * 4 + 21
 
-    P = np.zeros((size, size))
+    P = np.zeros((size, size), dtype=np.uint8)
 
     for x in range(size):
         if x > 7 and x < size - 7 and x % 2 == 0:
@@ -39,7 +39,7 @@ def generate_timing_patterns(version):
 def generate_dark_module(version):
     size = (version - 1) * 4 + 21
 
-    P = np.zeros((size, size))
+    P = np.zeros((size, size), dtype=np.uint8)
 
     P[4 * version + 9, 8] = 1
     
@@ -48,7 +48,7 @@ def generate_dark_module(version):
 def generate_reserved_areas(version):
     size = (version - 1) * 4 + 21
 
-    P = np.zeros((size, size))
+    P = np.zeros((size, size), dtype=np.uint8)
 
     P[:9, :9] = 1
     P[:9, size - 8:size] = 1
@@ -72,7 +72,7 @@ def generate_reserved_areas(version):
 
 def generate_version_info(version):
     size = (version - 1) * 4 + 21
-    V = np.zeros((size, size))
+    V = np.zeros((size, size), dtype=np.uint8)
     if version < 7:
         return V
     
@@ -95,6 +95,7 @@ def generate_version_info(version):
             V[i, size - 11 + j] = color
             binVersion = binVersion >> 1
 
+    print("ver:", V)
     return V
 
 def generate_format_info(version, correctionLevel, mask):
@@ -103,7 +104,7 @@ def generate_format_info(version, correctionLevel, mask):
     # Generate masked format string
     corrBits = CORRECTION_BITS[correctionLevel]
 
-    bits = (corrBits << 3) | mask
+    bits = (corrBits << 4) | mask
     currFormatString = bits << 10
 
     poly = 0b10100110111
@@ -119,8 +120,9 @@ def generate_format_info(version, correctionLevel, mask):
     maskedFormatString = combined ^ mask
 
     # Place masked format string onto QR Code
-    F = np.zeros((size, size))
-    for i in range(15):
+    F = np.zeros((size, size), dtype=np.uint8)
+    for j in range(15):
+        i = 14 - j
         bit = maskedFormatString & 0b1
         maskedFormatString = maskedFormatString >> 1
         if i < 6:
@@ -141,7 +143,7 @@ def generate_format_info(version, correctionLevel, mask):
 def add_padding(M, l, r, t, b):
     h, w = M.shape
 
-    P = np.zeros((h + t + b, w + l + r))
+    P = np.zeros((h + t + b, w + l + r), dtype=np.uint8)
 
     for i in range(h):
         for j in range(w):
@@ -157,7 +159,7 @@ FINDER_PATTERN = np.array([
     [1, 0, 1, 1, 1, 0, 1],
     [1, 0, 0, 0, 0, 0, 1],
     [1, 1, 1, 1, 1, 1, 1]
-])
+], dtype=np.uint8)
 
 ALIGNMENT_PATTERN = np.array([
     [1, 1, 1, 1, 1],
@@ -165,7 +167,7 @@ ALIGNMENT_PATTERN = np.array([
     [1, 0, 1, 0, 1],
     [1, 0, 0, 0, 1],
     [1, 1, 1, 1, 1]
-])
+], dtype=np.uint8)
 
 ALIGNMENT_LOCATIONS = {
     1: [],
@@ -238,7 +240,7 @@ CORRECTION_BITS = {
 
 #display.show_matrix(patterns)
 #display.show_matrix(generate_reserved_areas(version))
-
+#display.show_matrix(generate_format_info(2, 'M', 2))
 
 
 

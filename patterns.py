@@ -256,13 +256,13 @@ CORRECTION_BITS = {
 
 # generate_finder_patterns(1)
 
-version = 1
+version = 8
 errorCorrection = 'Q'
 mask = 6
 patterns = np.logical_or(np.logical_or(np.logical_or(np.logical_or(generate_finder_patterns(version),  generate_alignment_patterns(version)), np.logical_or(generate_timing_patterns(version), generate_dark_module(version))), generate_version_info(version)), generate_format_info(version, errorCorrection, mask))
 
 # (quiet zone)
-# patterns = add_padding(patterns, 4, 4, 4, 4)
+patterns = add_padding(patterns, 4, 4, 4, 4)
 
 display.show_matrix(patterns)
 #display.show_matrix(generate_reserved_areas(version))

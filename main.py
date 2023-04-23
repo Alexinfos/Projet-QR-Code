@@ -17,33 +17,36 @@ def bin_qr(binData, quality):
     # Determine best size
     charCount = np.ceil(binData.bit_length() / 8)
     minVersion = 0
+    offset = 2
     for i in range(40):
-        if common.BIN_CAPACITIES[str(i+1) + quality] >= charCount:
+        if i >= 10:
+            offset = 3
+        if (common.get_qr_properties(i + 1, quality)[0] - offset) >= charCount:
             minVersion = i + 1
             break
 
     if minVersion == 0:
-        print("Too much data to fit in QR code with this quality!\nTry using a lower quality")
+        print("Too much data to fit in a QR code with this quality!\nTry using a lower quality")
         return None
     
-    print(minVersion)
+    print("Minimal version:", minVersion)
 
     # Add byte mode
     charCountSize = 0
     if minVersion < 10:
         charCountSize = 8
+        capacityOffset = 2
     else:
         charCountSize = 16
+        capacityOffset = 3
 
-    # TODO: use real val
-    errCount = 10
-    
-    maxSize = common.BIN_CAPACITIES[str(minVersion) + quality] * 8
-    #10100110
+    capacity, errCount, (grp1Size, grp1BlockSize), (grp2Size, grp2BlockSize) = common.get_qr_properties(minVersion, quality)
+    maxSize = (capacity - capacityOffset) * 8
+    print(errCount)
 
     binData = (0b0100 << int(charCount * 8 + charCountSize)) | (int(charCount) << int(charCount * 8)) | binData
 
-    diff = common.BIN_CAPACITIES[str(minVersion) + quality] * 8 - binData.bit_length()
+    diff = maxSize - binData.bit_length()
     if diff > 4:
         #Todo add padding after terminator
         terminatorSize = int(((charCount * 8 + charCountSize + 4) % 8))
@@ -58,22 +61,55 @@ def bin_qr(binData, quality):
             else:
                 binData = (binData << 8) | 17
 
-    arr = common.bin_to_array(binData)
-    arr.reverse()
-    print(arr, len(arr))
+    dataArray = common.bin_to_array(binData)
+    dataArray.reverse()
 
-    #TODO: encode data
-    #dataStream = common.bytearray_to_bin([65, 118, 135, 71, 71, 7, 51, 162, 242, 247, 119, 119, 114, 231, 23, 38, 54, 246, 70, 82, 230, 54, 246, 210, 240, 236, 17, 236, 52, 61, 242, 187, 29, 7, 216, 249, 103, 87, 95, 69, 188, 134, 57, 20])
     rs.init_tables()
-    dataStream = common.bytearray_to_bin(rs.rs_encode_msg(arr, errCount))
-    print(dataStream.bit_length() / 8)
 
-    dataMatrix = place_data(minVersion, dataStream, maxSize + charCountSize + errCount * 8 + 8)
+    group1Data = []
+    group1EC = []
+    group2Data = []
+    group2EC = []
+    for i in range(grp1Size):
+        encodedMsg = rs.rs_encode_msg(dataArray[i*grp1BlockSize:(i+1)*grp1BlockSize], errCount)
+        group1Data.append(encodedMsg[:grp1BlockSize])
+        group1EC.append(encodedMsg[grp1BlockSize:])
+    for i in range(grp2Size):
+        encodedMsg = rs.rs_encode_msg(dataArray[i*grp2BlockSize:(i+1)*grp2BlockSize], errCount)
+        group2Data.append(encodedMsg[:grp2BlockSize])
+        group2EC.append(encodedMsg[grp2BlockSize:])
 
-    #display.show_matrix(dataMatrix)
+    interleavedData = []
+    for i in range(max(grp1BlockSize, grp2BlockSize)):
+        if i < grp1BlockSize:
+            for j in range(grp1Size):
+                interleavedData.append(group1Data[j][i])
+                #print("G1", j, i)
+
+        if i < grp2BlockSize:
+            for j in range(grp2Size):
+                interleavedData.append(group2Data[j][i])
+                #print("G2", j, i)
+
+    interleavedEC = []
+    for i in range(errCount):
+        for j in range(grp1Size):
+            interleavedEC.append(group1EC[j][i])
+
+        for j in range(grp2Size):
+            interleavedEC.append(group2EC[j][i])
+
+    interleavedCodewords = interleavedData + interleavedEC
+
+    dataStream = common.bytearray_to_bin(interleavedCodewords)
+
+    #print(bin(dataStream))
+
+    dataMatrix = place_data(minVersion, dataStream, (capacity + errCount * (grp1Size + grp2Size)) * 8)
+
+    #display.show_matrix(dataMatrix, showAxis=True)
 
     mask = choose_mask(minVersion, quality, dataMatrix)
-
     M = patterns.add_padding(mask_data(minVersion, dataMatrix, mask) | generate_patterns(minVersion, quality, mask), 4, 4, 4, 4)
 
     return M
@@ -125,6 +161,7 @@ def place_data(version, data, dataSize):
             count = count + 1
 
         #print(dataSize, count)
+        #print(posX, posY)
 
         if lastMoveHorizontal:
             lastMoveHorizontal = False
@@ -150,9 +187,9 @@ def place_data(version, data, dataSize):
                 posX = 5
             directionUp = True
 
-        if posY < 0 and posX < 0:
-            #raise IndexError("Trop de données pour ce format")
-            print("Trop de données pour ce format ?")
+        if posX < -1:
+            raise IndexError("Trop de données pour ce format")
+            #print("Trop de données pour ce format !")
             #print(count, count / 8)
             #print(bin(data))
     
@@ -257,22 +294,10 @@ def mask_data(version, dataMatrix, mask):
 
     return np.logical_xor(dataMatrix, MM)
 
-# Tests
-# for i in range(8):
-#    mask_data(8, None, i)
 
-# Msg: Hello World !
-#msg = [72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 32, 33, 32, 32, 32, 32, 32, 32, 32]
-msg = common.conversion_entier("Ceci est ")
-
-# Msg: https://www.qrcode.com/
-#msg = [104, 116, 116, 112, 115, 58, 47, 47, 119, 119, 119, 46, 113, 114, 99, 111, 100, 101, 46, 99, 111, 109, 47]
+msg = common.conversion_entier("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla pharetra dapibus sapien, id sollicitudin augue ullamcorper quis. Morbi id condimentum tortor. Sed finibus ligula risus, at fringilla ex sollicitudin dapibus. Vestibulum non erat tempus, gravida risus ut, sodales diam. Etiam tristique hendrerit posuere. Proin sagittis libero quam, et mattis ex finibus a. Donec varius urna ac sollicitudin pellentesque. Donec at sapien et magna auctor porta. Donec tristique erat a velit feugiat hendrerit eget quis enim. Proin sit amet mollis eros. Sed rutrum vel dui in blandit. Vestibulum ex ligula, accumsan a lacinia ut, porttitor eget eros. Vestibulum nunc quam, sagittis sed dignissim in, venenatis quis sapien. Nulla facilisi.")
 common.array_to_bin(msg)
 
-testDat = 0b11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111
-#dat = place_data(1, testDat)
-#display.show_matrix(dat)
 display.show_matrix(bin_qr(common.bytearray_to_bin(msg), 'M'))
-#display.show_matrix(patterns.generate_reserved_areas(1))
 
-
+#display.save_matrix(bin_qr(common.bytearray_to_bin(msg), 'M'), 'qr.png')

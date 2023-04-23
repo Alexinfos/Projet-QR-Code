@@ -95,7 +95,7 @@ def generate_version_info(version):
             V[i, size - 11 + j] = color
             binVersion = binVersion >> 1
 
-    print("ver:", V)
+    #print("ver:", V)
     return V
 
 def generate_format_info(version, correctionLevel, mask):
@@ -211,6 +211,8 @@ ALIGNMENT_LOCATIONS = {
     39: [6, 26, 54, 82, 110, 138, 166],
     40: [6, 30, 58, 86, 114, 142, 170]
 }
+
+
 
 CORRECTION_BITS = {
     0: 0b01,

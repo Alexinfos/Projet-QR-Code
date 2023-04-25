@@ -3,7 +3,8 @@ import display
 import numpy as np
 import masks
 import common
-import reed_solomon as rs
+#import reed_solomon as rs
+from mot import mot as rs_encode_word
 
 """
 TODO:
@@ -64,18 +65,20 @@ def bin_qr(binData, quality):
     dataArray = common.bin_to_array(binData)
     dataArray.reverse()
 
-    rs.init_tables()
+    #rs.init_tables()
 
     group1Data = []
     group1EC = []
     group2Data = []
     group2EC = []
     for i in range(grp1Size):
-        encodedMsg = rs.rs_encode_msg(dataArray[i*grp1BlockSize:(i+1)*grp1BlockSize], errCount)
+        encodedMsg = rs_encode_word(dataArray[i*grp1BlockSize:(i+1)*grp1BlockSize], grp1BlockSize + errCount, grp1BlockSize)
+        #encodedMsg = rs.rs_encode_msg(dataArray[i*grp1BlockSize:(i+1)*grp1BlockSize], errCount)
         group1Data.append(encodedMsg[:grp1BlockSize])
         group1EC.append(encodedMsg[grp1BlockSize:])
     for i in range(grp2Size):
-        encodedMsg = rs.rs_encode_msg(dataArray[i*grp2BlockSize:(i+1)*grp2BlockSize], errCount)
+        encodedMsg = rs_encode_word(dataArray[i*grp2BlockSize:(i+1)*grp2BlockSize], grp2BlockSize + errCount, grp2BlockSize)
+        #encodedMsg = rs.rs_encode_msg(dataArray[i*grp2BlockSize:(i+1)*grp2BlockSize], errCount)
         group2Data.append(encodedMsg[:grp2BlockSize])
         group2EC.append(encodedMsg[grp2BlockSize:])
 
@@ -295,7 +298,9 @@ def mask_data(version, dataMatrix, mask):
     return np.logical_xor(dataMatrix, MM)
 
 
-msg = common.conversion_entier("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla pharetra dapibus sapien, id sollicitudin augue ullamcorper quis. Morbi id condimentum tortor. Sed finibus ligula risus, at fringilla ex sollicitudin dapibus. Vestibulum non erat tempus, gravida risus ut, sodales diam. Etiam tristique hendrerit posuere. Proin sagittis libero quam, et mattis ex finibus a. Donec varius urna ac sollicitudin pellentesque. Donec at sapien et magna auctor porta. Donec tristique erat a velit feugiat hendrerit eget quis enim. Proin sit amet mollis eros. Sed rutrum vel dui in blandit. Vestibulum ex ligula, accumsan a lacinia ut, porttitor eget eros. Vestibulum nunc quam, sagittis sed dignissim in, venenatis quis sapien. Nulla facilisi.")
+#msg = common.conversion_entier("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla pharetra dapibus sapien, id sollicitudin augue ullamcorper quis. Morbi id condimentum tortor. Sed finibus ligula risus, at fringilla ex sollicitudin dapibus. Vestibulum non erat tempus, gravida risus ut, sodales diam. Etiam tristique hendrerit posuere. Proin sagittis libero quam, et mattis ex finibus a. Donec varius urna ac sollicitudin pellentesque. Donec at sapien et magna auctor porta. Donec tristique erat a velit feugiat hendrerit eget quis enim. Proin sit amet mollis eros. Sed rutrum vel dui in blandit. Vestibulum ex ligula, accumsan a lacinia ut, porttitor eget eros. Vestibulum nunc quam, sagittis sed dignissim in, venenatis quis sapien. Nulla facilisi.")
+#msg = common.conversion_entier("https://github.com/Alexinfos/Projet-QR-Code")
+msg = common.conversion_entier("Merci de nous avoir écouté !")
 common.array_to_bin(msg)
 
 display.show_matrix(bin_qr(common.bytearray_to_bin(msg), 'M'))
